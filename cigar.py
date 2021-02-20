@@ -123,10 +123,15 @@ class Cigar(object):
         else:
             pass
 
-        new_cigs[:i] = [(l, op if op in "HS" else "S") for l, op in
-                new_cigs[:i]]
+        j=i
+        for (l,op) in new_cigs:
+            if op=='D':
+                new_cigs.remove((l,op))
+                j=j-1
+        new_cigs[:j] = [(l, op if op in "HS" else "S") for l, op in
+                new_cigs[:j]]
         new_cigs.extend(cigs[i + 1:])
-        return Cigar(Cigar.string_from_elements(new_cigs)).merge_like_ops()
+        return Cigar(Cigar.string_from_elements(new_cigs)).merge_like_ops().merge_softclipped_insertions().merge_softclipped_deletions().merge_like_ops()
 
 
     @classmethod
@@ -144,6 +149,28 @@ class Cigar(object):
 
     def _reverse_cigar(self):
         return Cigar.string_from_elements(list(self.items())[::-1])
+
+    def merge_softclipped_deletions(self):
+
+        cigs = []
+
+        for _idx, (n,op) in enumerate(self.items()):
+            if not ((op == 'N' or op =='D') and \
+                    ((0<_idx and _idx-1<len(cigs) and cigs[_idx-1][1] == 'S'))):
+                cigs.append((n,op))
+
+        return Cigar(self.string_from_elements(cigs))
+
+    def merge_softclipped_insertions(self):
+
+        cigs = list(self.items())
+
+        for _idx, (n,op) in enumerate(cigs):
+            if op == 'I' or op ==' P':
+                if 0<_idx and cigs[_idx-1][1] == 'S':
+                    cigs[_idx]=(n,'S')
+
+        return Cigar(self.string_from_elements(cigs))
 
     def merge_like_ops(self):
         """
